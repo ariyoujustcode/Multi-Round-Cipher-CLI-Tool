@@ -13,10 +13,10 @@ def get_parser() -> argparse.ArgumentParser:
     parser.add_argument("input_file", help="Path to the input file")
     parser.add_argument("output_file", help="Path to the output file")
     parser.add_argument(
-        "dimension", type=int, help="Columnar matrix size (e.g., 4 for 4x4 matrix)"
+        "dimension", type=int, help="Columnar dimensions (ie. 4 -> 4x4 grid)"
     )
     parser.add_argument(
-        "rounds", type=int, help="Number of rounds for encryption/decryption"
+        "rounds", type=int, help="Number of rounds for multi-round product cipher"
     )
 
     return parser
@@ -59,11 +59,23 @@ def perform_columnar(block: list[int]) -> str:
     return encrypted_block
 
 
-def encrypt(key_file, input_file, output_file, dimension, rounds):
+def encrypt(key_file_path, input_file_path, output_file, dimension, rounds) -> str:
+    key = read_file(key_file_path)
+    message = read_file(input_file_path)
+
+    shift_values = get_shift_values(key)
+
+    for round in rounds:
+        vignere_cipher = perform_vignere(shift_values, message)
+        vignere_block = create_block(vignere_cipher, dimension)
+
+    vignere_padded_block = add_padding(vignere_block)
+    columnar_cipher = perform_columnar(vignere_padded_block)
+
     print("encrypting...")
 
 
-def decrypt(key_file, input_file, output_file, dimension, rounds):
+def decrypt(key_file, input_file, output_file, dimension, rounds) -> str:
     print("decrypyting...")
 
 
