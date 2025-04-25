@@ -41,14 +41,22 @@ def get_key(path: str) -> str:
     return read_file(path)
 
 
+def get_key_from_binary(binary_key_path: str) -> str:
+    return read_binary_file(binary_key_path)
+
+
 def get_message(path: str) -> str:
     return read_file(path)
 
 
-def write_file(path: str, cipher_text: str) -> None:
+def get_message_from_binary(binary_input_path: str) -> str:
+    return read_binary_file(binary_input_path)
+
+
+def write_file(path: str, contents: str) -> None:
     try:
         with open(path, "w") as file:
-            file.write(cipher_text)
+            file.write(contents)
     except PermissionError:
         print(f"Error: Cannot write to '{path}' — permission denied.")
         raise
@@ -72,10 +80,30 @@ def get_binary_shift_values(byte_key: bytes) -> list[int]:
     return shift_values
 
 
-def add_padding(vignere_cipher: str) -> str:
-    padded_vignere_cipher = ""
-    print("Adding padding...")
-    return padded_vignere_cipher
+def add_padding(block: list[str], block_size: int) -> None:
+    padding_needed = block_size - len(block)
+
+    if padding_needed > 0:
+        block.append("X")
+        block.extend(["Y"] * (padding_needed - 1))
+
+
+def create_blocks(contents: str, dimension: int) -> list[list[str]]:
+    block_size = dimension * dimension
+    blocks = []
+    block = []
+
+    for char in contents:
+        block.append(char)
+        if len(block) == block_size:
+            blocks.append(block)
+            block = []
+
+    if block:
+        add_padding(block, block_size)
+        blocks.append(block)
+
+    return blocks
 
 
 def perform_vignere(shift_values: list[int], message: str) -> str:
@@ -84,24 +112,28 @@ def perform_vignere(shift_values: list[int], message: str) -> str:
     return vignere_cipher
 
 
-def create_block(vignere_cipher: str, dimension: int) -> list[int]:
-    print("Creating block...")
-
-
 def perform_columnar(block: list[int]) -> str:
     encrypted_block = ""
     return encrypted_block
 
 
 def encrypt(key_file_path, input_file_path, dimension, rounds) -> str:
-    key = get_key(key_file_path)
-    message = get_message(input_file_path)
     cipher_text = ""
-
     try:
-        shift_values = get_shift_values(key)
+        key = get_key(key_file_path)
+        message = get_message(input_file_path)
     except:
-        shift_values_from_binary = get_binary_shift_values(key)
+        key_from_binary = get_key_from_binary(key_file_path)
+        message_from_binary = get_message_from_binary(input_file_path)
+
+    if key:
+        shift_values = get_shift_values(key)
+    elif key_from_binary:
+        shift_values_from_binary = get_binary_shift_values(key_from_binary)
+    else:
+        print(
+            "Error: cannot determine shift values from input key. Accepted keys must be binary or plaintext."
+        )
 
     for round in rounds:
         vignere_cipher = perform_vignere(shift_values, message)
