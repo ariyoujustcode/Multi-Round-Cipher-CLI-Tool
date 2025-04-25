@@ -23,18 +23,52 @@ def get_parser() -> argparse.ArgumentParser:
 
 
 def read_file(path: str) -> str:
-    with open(path, "r") as file:
+    try:
+        with open(path, "r") as file:
+            return file.read()
+    except FileNotFoundError:
+        print(f"Error: File not found at path '{path}'")
+        raise
+    except PermissionError:
+        print(f"Error: Permission denied for file '{path}'")
+        raise
+    except Exception as e:
+        print(f"Error reading file '{path}': {e}")
+        raise
+
+
+def get_key(path: str) -> str:
+    return read_file(path)
+
+
+def get_message(path: str) -> str:
+    return read_file(path)
+
+
+def write_file(path: str, cipher_text: str) -> None:
+    try:
+        with open(path, "w") as file:
+            file.write(cipher_text)
+    except PermissionError:
+        print(f"Error: Cannot write to '{path}' — permission denied.")
+        raise
+    except Exception as e:
+        print(f"Error writing to file '{path}': {e}")
+        raise
+
+
+def get_shift_values(key: str) -> list[int]:
+    shift_values = [ord(char) % 26 for char in key]
+    return shift_values
+
+
+def read_binary_file(path: str) -> bytes:
+    with open(path, "rb") as file:
         return file.read()
 
 
-def write_file(path: str, contents: str) -> None:
-    with open(path, "w") as file:
-        file.write(contents)
-
-
-def get_shift_values(key_file) -> list[int]:
-    shift_values = []
-    print("Calculating shift values for vignere cipher...")
+def get_binary_shift_values(byte_key: bytes) -> list[int]:
+    shift_values = [b % 26 for b in byte_key]
     return shift_values
 
 
@@ -59,11 +93,15 @@ def perform_columnar(block: list[int]) -> str:
     return encrypted_block
 
 
-def encrypt(key_file_path, input_file_path, output_file, dimension, rounds) -> str:
-    key = read_file(key_file_path)
-    message = read_file(input_file_path)
+def encrypt(key_file_path, input_file_path, dimension, rounds) -> str:
+    key = get_key(key_file_path)
+    message = get_message(input_file_path)
+    cipher_text = ""
 
-    shift_values = get_shift_values(key)
+    try:
+        shift_values = get_shift_values(key)
+    except:
+        shift_values_from_binary = get_binary_shift_values(key)
 
     for round in rounds:
         vignere_cipher = perform_vignere(shift_values, message)
@@ -72,16 +110,37 @@ def encrypt(key_file_path, input_file_path, output_file, dimension, rounds) -> s
     vignere_padded_block = add_padding(vignere_block)
     columnar_cipher = perform_columnar(vignere_padded_block)
 
-    print("encrypting...")
 
-
-def decrypt(key_file, input_file, output_file, dimension, rounds) -> str:
+def decrypt(key_file, input_file, dimension, rounds) -> str:
     print("decrypyting...")
 
 
 def main():
     parser = get_parser()
     args = parser.parse_args()
+
+    try:
+        if args.operation == "encode":
+            cipher_text = encrypt(
+                args.key_file, args.input_file, args.dimension, args.rounds
+            )
+
+            write_file(args.output_file, cipher_text)
+            print(
+                f"Your message has been successfully encrypted. The ciphertext can be found in {args.output_file}."
+            )
+
+        elif args.operation == "decode":
+            message = decrypt(
+                args.key_file, args.input_file, args.dimension, args.rounds
+            )
+
+            write_file(args.output_file, message)
+            print(
+                f"This ciphertext has been successfully decrypted. The message can be found in {args.output_file}."
+            )
+    except Exception as e:
+        print(f"There was an error during the {args.operation} operation: {e}")
 
 
 if __name__ == "__main__":
