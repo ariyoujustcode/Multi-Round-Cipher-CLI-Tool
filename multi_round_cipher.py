@@ -37,8 +37,13 @@ def read_file(path: str) -> str:
         raise
 
 
+def read_binary_file(path: str) -> bytes:
+    with open(path, "rb") as file:
+        return file.read()
+
+
 def get_key(path: str) -> str:
-    return read_file(path)
+    return read_file(path).upper()
 
 
 def get_key_from_binary(binary_key_path: str) -> str:
@@ -46,7 +51,7 @@ def get_key_from_binary(binary_key_path: str) -> str:
 
 
 def get_message(path: str) -> str:
-    return read_file(path)
+    return read_file(path).upper()
 
 
 def get_message_from_binary(binary_input_path: str) -> str:
@@ -70,17 +75,13 @@ def get_shift_values(key: str) -> list[int]:
     return shift_values
 
 
-def read_binary_file(path: str) -> bytes:
-    with open(path, "rb") as file:
-        return file.read()
-
-
 def get_binary_shift_values(byte_key: bytes) -> list[int]:
     shift_values = [b % 26 for b in byte_key]
     return shift_values
 
 
 def add_padding(block: list[str], block_size: int) -> None:
+    print("Adding padding...")
     padding_needed = block_size - len(block)
 
     if padding_needed > 0:
@@ -88,7 +89,19 @@ def add_padding(block: list[str], block_size: int) -> None:
         block.extend(["Y"] * (padding_needed - 1))
 
 
+def remove_padding(blocks: list[list[str]], block_size: int) -> None:
+    print("Removing padding...")
+    length = len(blocks)
+
+    for block in blocks:
+        for i in range(len(block) - 1, -1, -1):
+            if block[i] == "X":
+                del block[i:]
+                break
+
+
 def create_blocks(contents: str, dimension: int) -> list[list[str]]:
+    print("Creating blocks...")
     block_size = dimension * dimension
     blocks = []
     block = []
@@ -107,18 +120,79 @@ def create_blocks(contents: str, dimension: int) -> list[list[str]]:
 
 
 def perform_vignere(shift_values: list[int], message: str) -> str:
-    vignere_cipher = ""
-    print("performing vignere...")
-    return vignere_cipher
+    print("Performing vignere...")
+    cipher_text = []
+    key_length = len(shift_values)
+
+    for i, char in enumerate(message):
+        if char.isalpha():
+            shift = shift_values[i % key_length]
+            encrypted_char = chr((ord(char) - ord("A") + shift) % 26 + ord("A"))
+            cipher_text.append(encrypted_char)
+        else:
+            cipher_text.append(char)
+
+    return "".join(cipher_text)
 
 
-def perform_columnar(block: list[int]) -> str:
-    encrypted_block = ""
-    return encrypted_block
+def perform_vignere_on_binary(shift_values: list[int], message_bytes: bytes) -> bytes:
+    print("Performing vignere on binary...")
+
+    vignere_bytes = bytearray()
+    shift_len = len(shift_values)
+
+    for i, byte in enumerate(message_bytes):
+        shift = shift_values[i % shift_len]
+        shifted_byte = (byte + shift) % 256
+        vignere_bytes.append(shifted_byte)
+
+    return bytes(vignere_bytes)
+
+
+def reverse_vignere(shift_values: list[int], cipher_text: str) -> str:
+    print("Reversing vignere...")
+
+
+def perform_columnar(blocks: list[list[str]], dimension: int) -> str:
+    print("Performing columnar transposition...")
+    encrypted_text = ""
+
+    for block in blocks:
+        for col in range(dimension):
+            for row in range(dimension):
+                index = row * dimension + col
+                if index < len(block):
+                    encrypted_text += block[index]
+
+    return encrypted_text
+
+
+def perform_columnar_on_binary(blocks: list[list[int]], dimension: int) -> bytes:
+    print("Performing columnar transposition on binary...")
+    encrypted_bytes = bytearray()
+
+    for block in blocks:
+        for col in range(dimension):
+            for row in range(dimension):
+                index = row * dimension + col
+                if index < len(block):
+                    encrypted_bytes.append(block[index])
+
+    return bytes(encrypted_bytes)
+
+
+def reverse_columnar(blocks: list[list[int]]) -> str:
+    print("Reversing columnar transposition...")
 
 
 def encrypt(key_file_path, input_file_path, dimension, rounds) -> str:
+    print("Encrypting message...")
+    key = None
+    message = None
+    key_from_binary = None
+    message_from_binary = None
     cipher_text = ""
+
     try:
         key = get_key(key_file_path)
         message = get_message(input_file_path)
@@ -126,25 +200,35 @@ def encrypt(key_file_path, input_file_path, dimension, rounds) -> str:
         key_from_binary = get_key_from_binary(key_file_path)
         message_from_binary = get_message_from_binary(input_file_path)
 
-    if key:
-        shift_values = get_shift_values(key)
-    elif key_from_binary:
-        shift_values_from_binary = get_binary_shift_values(key_from_binary)
-    else:
-        print(
-            "Error: cannot determine shift values from input key. Accepted keys must be binary or plaintext."
-        )
+    for _ in range(rounds):
+        if key and message:
+            shift_values = get_shift_values(key)
+            vignere_cipher = perform_vignere(shift_values, message)
+            blocks = create_blocks(vignere_cipher, dimension)
+            cipher_text = perform_columnar(blocks, dimension)
+            message = cipher_text
+        elif key_from_binary and message_from_binary:
+            shift_values_from_binary = get_binary_shift_values(key_from_binary)
+            vignere_cipher = perform_vignere_on_binary(
+                shift_values_from_binary, message_from_binary
+            )
+            block_size = dimension * dimension
+            blocks = [
+                list(vignere_cipher[i : i + block_size])
+                for i in range(0, len(vignere_cipher), block_size)
+            ]
+            cipher_text = perform_columnar_on_binary(blocks, dimension)
+            message_from_binary = cipher_text
+        else:
+            raise ValueError("Error: Please provide a valid key and message.")
 
-    for round in rounds:
-        vignere_cipher = perform_vignere(shift_values, message)
-        vignere_block = create_block(vignere_cipher, dimension)
-
-    vignere_padded_block = add_padding(vignere_block)
-    columnar_cipher = perform_columnar(vignere_padded_block)
+    return cipher_text
 
 
 def decrypt(key_file, input_file, dimension, rounds) -> str:
-    print("decrypyting...")
+    print("Decrypting text...")
+    message = ""
+    return message
 
 
 def main():
