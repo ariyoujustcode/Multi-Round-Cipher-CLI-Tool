@@ -44,34 +44,30 @@ def get_binary_shift_values(binary_key: bytes) -> list[int]:
     return [byte for byte in binary_key]
 
 
-def pad_block(blocks: list[list[str]], dimension: int) -> list[list[str]]:
-    chars_in_block = dimension * dimension
+def pad_block(block: list[str], chars_in_block: int) -> list[str]:
     padding_needed = chars_in_block - len(block)
 
     block.append("X")
     block.extend(["Y"] * (padding_needed - 1))
-
-    while len(blocks) < dimension:
-        padding_block = ["X"] + ["Y"] * (chars_in_block - 1)
-        blocks.append(padding_block)
+    return block
 
 
 # Plaintext Vignere
 def perform_vignere_on_plaintext(
-    plaintext_shift_values: list[int], plaintext_message: str
-) -> str:
+    plaintext_shift_values: list[int], block: list[str]
+) -> list[str]:
     print("Performing vignere on plaintext...")
-    shifted_text = ""
+    shifted_text = []
 
     shift_len = len(plaintext_shift_values)
 
-    for i, char in enumerate(plaintext_message):
+    for i, char in enumerate(block):
         if char.isalpha():
             shift = plaintext_shift_values[i % shift_len]
             shifted_char = chr(((ord(char.upper()) - ord("A") + shift) % 26) + ord("A"))
-            shifted_text += shifted_char
+            shifted_text.append(shifted_char)
         else:
-            shifted_text += char
+            shifted_text.append(char)
 
     return shifted_text
 
@@ -97,22 +93,13 @@ def split_plaintext_into_blocks(shifted_plaintext: str, dimension) -> list[list[
     print("Splitting plaintext into blocks...")
     blocks = []
     block = []
-    chars_in_block = dimension * dimension
+    block_size = dimension * dimension
 
     for char in shifted_plaintext:
         block.append(char)
-        if len(block) == chars_in_block:
+        if len(block) == block_size:
             blocks.append(block)
             block = []
-
-    if block:
-        padding_needed = chars_in_block - len(block)
-        block.append("X")
-        block.extend(["Y"] * (padding_needed - 1))
-
-    while len(blocks) < dimension:
-        padding_block = ["X"] + ["Y"] * (chars_in_block - 1)
-        blocks.append(padding_block)
 
     return blocks
 
@@ -123,17 +110,14 @@ def split_binary_into_blocks(shifted_binary: bytes, dimension) -> list[list[byte
     block = []
     bytes_in_block = dimension * dimension
 
-    # Split the binary data into blocks
     for i in range(0, len(shifted_binary), bytes_in_block):
         blocks.append(shifted_binary[i : i + bytes_in_block])
 
-    # Handle any leftover bytes and add padding
     if len(blocks[-1]) < bytes_in_block:
         padding_needed = bytes_in_block - len(blocks[-1])
-        # Add padding bytes (0x58 for 'X', 0x59 for 'Y')
+
         blocks[-1].extend([0x58] + [0x59] * (padding_needed - 1))
 
-    # If there are fewer blocks than the dimension, add padding blocks
     while len(blocks) < dimension:
         padding_block = [0x58] + [0x59] * (bytes_in_block - 1)
         blocks.append(padding_block)
@@ -142,13 +126,20 @@ def split_binary_into_blocks(shifted_binary: bytes, dimension) -> list[list[byte
 
 
 # Plaintext columnar transposition
-def perform_columnar_on_plaintext(blocks: list[list[str]], dimension: int) -> str:
+def perform_columnar_on_plaintext(
+    vigenere_result: list[str], dimension: int
+) -> list[str]:
     print("Performing columnar transposition on plaintext...")
-    transposed_text = ""
+    transposed_text = []
+
+    rows = [
+        vigenere_result[i : i + dimension]
+        for i in range(0, len(vigenere_result), dimension)
+    ]
 
     for col in range(dimension):
-        for block in blocks:
-            transposed_text += block[col]
+        for row in rows:
+            transposed_text.append(row[col])
 
     return transposed_text
 
@@ -171,33 +162,52 @@ def encrypt_plaintext(
 ) -> str:
     print("Encrypting message...")
     key = get_plaintext_key(key_file_path)
-    print(key)
+    print(f"Key: {key}")
     message = get_plaintext_message(input_file_path)
-    print(message)
+    print(f"Message: {message}")
+    block_size = dimension * dimension
+    block = []
+    blocks = []
+    cipher_text_blocks = []
+    cipher_text = ""
 
-    blocks = split_plaintext_into_blocks(shifted_text, dimension)
-    print(blocks)
+    list_message = list(message)
+    print(f"List message: {list_message}")
 
-    padded_message = pad_block(blocks, dimension)
-    print(f"Padded message: {padded_message}")
+    for char in list_message:
+        block.append(char)
+        if len(block) == block_size:
+            blocks.append(block)
+            block = []
 
-    shifted_text = perform_vignere_on_plaintext(
-        get_plaintext_shift_values(key), message
-    )
+    print(f"Blocks: {blocks}")
 
-    print(shifted_text)
+    if block:
+        pad_block(block)
+        blocks.append(block)
 
-    for round_num in range(rounds):
-        print(f"Round {round_num + 1}...")
+    if len(blocks) > 0 and len(blocks[-1]) == block_size:
+        padding_block = ["X"] + ["Y"] * (block_size - 1)
+        blocks.append(padding_block)
 
-        transposed_text = perform_columnar_on_plaintext(blocks, dimension)
-        print(transposed_text)
+    for block in blocks:
+        for r in range(rounds):
+            print(f"Round {r + 1}...")
+            if len(block) < block_size:
+                pad_block(block)
+            vigenere_result = perform_vignere_on_plaintext(
+                get_plaintext_shift_values(key), block
+            )
+            columnar_result = perform_columnar_on_plaintext(vigenere_result, dimension)
+            print(f"Result after round {r + 1}: {columnar_result}")
 
-        shifted_text = transposed_text
-        print(shifted_text)
+            block = columnar_result
+        cipher_text_blocks.append("".join(block))
 
-    cipher_text = shifted_text
-    print(cipher_text)
+    print(f"Result after all blocks and rounds: {cipher_text_blocks}")
+
+    cipher_text = "".join(cipher_text_blocks)
+
     return cipher_text
 
 
