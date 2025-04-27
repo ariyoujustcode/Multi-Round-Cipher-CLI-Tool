@@ -55,12 +55,12 @@ def pad_block(block: list[str], dimension: int) -> list[str]:
 
 
 # Binary padding
-def pad_binary_block(binary_block: list[bytes], dimension: int) -> list[bytes]:
+def pad_binary_block(binary_block: bytearray, dimension: int) -> bytearray:
     block_size = dimension * dimension
     padding_needed = block_size - len(binary_block)
 
-    binary_block.append(b"\x00")
-    binary_block.extend([b"\xff"] * (padding_needed - 1))
+    binary_block.append(0)
+    binary_block.extend([0xFF] * (padding_needed - 1))
     return binary_block
 
 
@@ -86,17 +86,17 @@ def perform_vigenere_on_plaintext(
 
 # Binary vignere
 def perform_vigenere_on_binary(
-    binary_shift_values: list[int], binary_block: list[int]
-) -> list[bytes]:
+    binary_shift_values: list[int], binary_block: bytearray
+) -> bytearray:
     print("Performing vigenere on binary...")
-    shifted_binary = []
+    shifted_binary = bytearray()
 
     shift_len = len(binary_shift_values)
 
     for i, byte in enumerate(binary_block):
         shift = binary_shift_values[i % shift_len]
         shifted_byte = (byte + shift) % 256
-        shifted_binary.append(bytes([shifted_byte]))
+        shifted_binary.append(shifted_byte)
 
     return shifted_binary
 
@@ -122,10 +122,10 @@ def perform_columnar_on_plaintext(
 
 # Binary columnar transposition
 def perform_columnar_on_binary(
-    binary_vigenere_result: list[bytes], dimension: int
-) -> list[bytes]:
+    binary_vigenere_result: bytearray, dimension: int
+) -> bytearray:
     print("Performing columnar transposition on binary...")
-    transposed_binary = []
+    transposed_binary = bytearray()
 
     rows = [
         binary_vigenere_result[i : i + dimension]
@@ -134,7 +134,8 @@ def perform_columnar_on_binary(
 
     for col in range(dimension):
         for row in rows:
-            transposed_binary.append(row[col])
+            if col < len(row):
+                transposed_binary.append(row[col])
 
     return transposed_binary
 
@@ -212,19 +213,6 @@ def write_plaintext_file(path: str, contents: str) -> None:
         raise
 
 
-# Output binary
-def write_binary_file(path: str, contents: bytes) -> None:
-    try:
-        with open(path, "wb") as file:
-            file.write(contents)
-    except PermissionError:
-        print(f"Error: Cannot write to '{path}' — permission denied.")
-        raise
-    except Exception as e:
-        print(f"Error writing to file '{path}': {e}")
-        raise
-
-
 # Binary encryption
 def encrypt_binary(
     binary_key_path: str, input_path: str, dimension: int, rounds: int
@@ -242,18 +230,17 @@ def encrypt_binary(
             f"The binary message must be at least {block_size} bytes because the dimension is {dimension}."
         )
 
-    binary_block = []
+    binary_block = bytearray()
     binary_blocks = []
-    binary_cipher_text_blocks = []
+    binary_cipher_blocks = []
 
-    binary_message_list = list(binary_message)
-    print(f"Binary list message: {binary_message_list}")
+    print(f"Binary list message: {binary_message}")
 
-    for byte in binary_message_list:
+    for byte in binary_message:
         binary_block.append(byte)
         if len(binary_block) == block_size:
             binary_blocks.append(binary_block)
-            binary_block = []
+            binary_block = bytearray()
 
     print(f"Binary blocks: {binary_blocks}")
 
@@ -262,7 +249,7 @@ def encrypt_binary(
         binary_blocks.append(binary_block)
 
     if len(binary_blocks) > 0 and len(binary_blocks[-1]) == block_size:
-        binary_padding_block = [0] + [255] * (block_size - 1)
+        binary_padding_block = bytearray([0] + [255] * (block_size - 1))
         binary_blocks.append(binary_padding_block)
 
     for binary_block in binary_blocks:
@@ -279,13 +266,28 @@ def encrypt_binary(
             print(f"Result after round {r + 1}: {binary_columnar_result}")
 
             binary_block = binary_columnar_result
-        binary_cipher_text_blocks.append(bytes(binary_block))
+        binary_cipher_blocks.append(bytes(binary_block))
 
-    print(f"Result after all blocks and rounds: {binary_cipher_text_blocks}")
+    print(f"Result after all blocks and rounds: {binary_cipher_blocks}")
 
-    binary_cipher = b"".join(binary_cipher_text_blocks)
-
+    binary_cipher = b"".join(binary_cipher_blocks)
+    print(f"Binary cipher: {binary_cipher}")
+    hex_binary_cipher = binary_cipher.hex()
+    print(f"Hex binary cipher: {hex_binary_cipher}")
     return binary_cipher
+
+
+# Output binary
+def write_binary_file(path: str, contents: bytes) -> None:
+    try:
+        with open(path, "wb") as file:
+            file.write(contents)
+    except PermissionError:
+        print(f"Error: Cannot write to '{path}' — permission denied.")
+        raise
+    except Exception as e:
+        print(f"Error writing to file '{path}': {e}")
+        raise
 
 
 # Decryption
