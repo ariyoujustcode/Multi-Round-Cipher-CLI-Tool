@@ -1,6 +1,7 @@
 import argparse
 
 
+# Return contents of any file type as bytes
 def read_file(path: str) -> bytes:
     try:
         with open(path, "rb") as file:
@@ -292,12 +293,65 @@ def write_binary_file(path: str, contents: bytes) -> None:
 
 # Decryption
 # Plaintext
-def reverse_columnar(blocks: list[list[int]]) -> str:
+def reverse_plaintext_columnar(
+    plaintext_cipher_block: list[str], dimension: int
+) -> list[str]:
     print("Reversing columnar transposition on plaintext...")
+    num_rows = len(plaintext_cipher_block) // dimension
+
+    vigenere_result = [""] * len(plaintext_cipher_block)
+
+    idx = 0
+    for col in range(dimension):
+        for row in range(num_rows):
+            vigenere_result[row * dimension + col] = plaintext_cipher_block[idx]
+            idx += 1
+
+    print(vigenere_result)
+    return vigenere_result
 
 
-def reverse_vignere(shift_values: list[int], cipher_text: str) -> str:
+def reverse_plaintext_vigenere(
+    plaintext_shift_values: list[int], reverse_transposition: list[str]
+) -> list[str]:
     print("Reversing vignere on plaintext...")
+    reverse_vigenere = []
+
+    shift_len = len(plaintext_shift_values)
+
+    for i, char in enumerate(reverse_transposition):
+        if char.isalpha():
+            shift = plaintext_shift_values[i % shift_len]
+            if char.isupper():
+                shifted_char = chr(((ord(char) - ord("A") - shift) % 26) + ord("A"))
+                print(f"Shifted char: {shifted_char}")
+                reverse_vigenere.append(shifted_char)
+            else:
+                shifted_char = chr(((ord(char) - ord("a") - shift) % 26) + ord("a"))
+                reverse_vigenere.append(shifted_char)
+        else:
+            reverse_vigenere.append(char)
+
+    print(f"Reverse vigenere: {reverse_vigenere}")
+
+    return reverse_vigenere
+
+
+def remove_plaintext_padding(block: list[str]) -> list[str]:
+    print("Removing plaintext padding...")
+
+    if not block:
+        return block
+
+    if block[0] == "X" and block[-1] == "Y":
+        return []
+
+    else:
+        try:
+            x_index = block.index("X")
+            return block[:x_index]
+        except ValueError:
+            return block
 
 
 # Binary
@@ -305,19 +359,58 @@ def reverse_columnar_on_binary():
     print("Reversing columnar transposition on binary...")
 
 
-def reverse_vignere_on_binary():
+def reverse_vigenere_on_binary():
     print("Reversing vignere on binary...")
+
+
+def remove_binary_padding():
+    print("Removing binary padding...")
 
 
 # Plaintext decryption
 def decrypt_plaintext(key_file, input_file, dimension, rounds) -> str:
     print("Decrypting plaintext...")
-    message = ""
-    return message
+    decrypted_message = ""
+    plaintext_key = get_plaintext_key(key_file)
+    print(f"Plaintext key: {plaintext_key}")
+    plaintext_cipher = get_plaintext_message(input_file)
+    print(f"Plaintext cipher: {plaintext_cipher}")
+
+    block_size = dimension * dimension
+
+    block = []
+    blocks = []
+
+    for char in plaintext_cipher:
+        block.append(char)
+        if len(block) == block_size:
+            blocks.append(block)
+            block = []
+
+    for idx, block in enumerate(blocks):
+        for r in range(rounds):
+            print(f"Round: {r + 1}")
+            reverse_transposition = reverse_plaintext_columnar(block, dimension)
+            print(f"Reverse transposition: {reverse_transposition}")
+            reverse_vigenere = reverse_plaintext_vigenere(
+                get_plaintext_shift_values(plaintext_key), reverse_transposition
+            )
+            print(f"Reversed vigenere: {reverse_vigenere}")
+
+            block = reverse_vigenere
+
+        if idx == len(blocks) - 1:
+            block = remove_plaintext_padding(block)
+            print(f"Block after padding removal: {block}")
+
+        decrypted_message += "".join(block)
+        print(f"Decrypted message: {decrypted_message}")
+
+    return decrypted_message
 
 
 # Binary Decryption
-def decrypt_binary(key_file, input_file, dimension, rounds) -> str:
+def decrypt_binary(key_file, input_file, dimension, rounds) -> bytes:
     print("Decrypting binary...")
     message = ""
     return message
@@ -371,16 +464,19 @@ def main():
             )
         # Decryption
         elif args.operation == "decode":
+            # Binary input file
             if args.input_file.endswith(".bin"):
                 message = decrypt_binary(
                     args.key_file, args.input_file, args.dimension, args.rounds
                 )
                 write_binary_file(args.output_file, message)
+
+            # Plaintext input file
             else:
                 cipher_text = decrypt_plaintext(
                     args.key_file, args.input_file, args.dimension, args.rounds
                 )
-                write_plaintext_file(args.output_file, message)
+                write_plaintext_file(args.output_file, cipher_text)
 
             print(
                 f"This ciphertext has been successfully decrypted. The message can be found in {args.output_file}."
