@@ -355,16 +355,55 @@ def remove_plaintext_padding(block: list[str]) -> list[str]:
 
 
 # Binary
-def reverse_columnar_on_binary():
+def reverse_columnar_on_binary(binary_block: bytes, dimension: int) -> bytes:
     print("Reversing columnar transposition on binary...")
+    num_rows = len(binary_block) // dimension
+    vigenere_binary_result = bytearray(len(binary_block))
+
+    idx = 0
+    for col in range(dimension):
+        for row in range(num_rows):
+            vigenere_binary_result[row * dimension + col] = binary_block[idx]
+            idx += 1
+
+    print(vigenere_binary_result)
+    return vigenere_binary_result
 
 
-def reverse_vigenere_on_binary():
+def reverse_vigenere_on_binary(
+    binary_shift_values: list[int], reverse_binary_transposition: bytes
+) -> bytes:
     print("Reversing vignere on binary...")
+    reverse_binary_vigenere = bytearray()
+
+    binary_shift_len = len(binary_shift_values)
+
+    for i, byte in enumerate(reverse_binary_transposition):
+        binary_shift = binary_shift_values[i % binary_shift_len]
+        shifted_byte = (byte - binary_shift) % 256
+        print(f"Shifted byte: {shifted_byte}")
+        reverse_binary_vigenere.append(shifted_byte)
+
+    print(f"Reverse vigenere: {reverse_binary_vigenere}")
+    return reverse_binary_vigenere
 
 
-def remove_binary_padding():
+def remove_binary_padding(binary_block: bytes):
     print("Removing binary padding...")
+
+    if not binary_block:
+        return binary_block
+
+    if binary_block[0] == 0x58 and binary_block[-1] == 0x59:
+        return bytearray()
+
+    else:
+        try:
+            x_index = binary_block.index(0x58)
+            return binary_block[:x_index]
+
+        except ValueError:
+            return binary_block
 
 
 # Plaintext decryption
@@ -412,8 +451,46 @@ def decrypt_plaintext(key_file, input_file, dimension, rounds) -> str:
 # Binary Decryption
 def decrypt_binary(key_file, input_file, dimension, rounds) -> bytes:
     print("Decrypting binary...")
-    message = ""
-    return message
+    binary_key = get_binary_key(key_file)
+    print(f"Binary key: {binary_key}")
+    binary_cipher = get_binary_message(input_file)
+    print(f"Binary cipher: {binary_cipher}")
+    binary_cipher = bytearray(binary_cipher)
+    decrypted_binary_cipher = bytearray()
+
+    block_size = dimension * dimension
+
+    binary_block = bytearray()
+    binary_blocks = []
+
+    for byte in binary_cipher:
+        binary_block.append(byte)
+        if len(binary_block) == block_size:
+            binary_blocks.append(binary_block)
+            binary_block = bytearray()
+
+    for idx, binary_block in enumerate(binary_blocks):
+        for r in range(rounds):
+            print(f"Round: {r + 1}")
+            reverse_binary_transposition = reverse_columnar_on_binary(
+                binary_block, dimension
+            )
+            print(f"Reverse binary transposition: {reverse_binary_transposition}")
+            reverse_binary_vigenere = reverse_vigenere_on_binary(
+                get_binary_shift_values(binary_key), reverse_binary_transposition
+            )
+            print(f"Reversed binary vigenere: {reverse_binary_vigenere}")
+
+            binary_block = reverse_binary_vigenere
+
+        if idx == len(binary_blocks) - 1:
+            binary_block = remove_binary_padding(binary_block)
+            print(f"Binary block after padding removal: {binary_block}")
+
+        decrypted_binary_cipher.extend(binary_block)
+        print(f"Decrypted message: {decrypted_binary_cipher}")
+
+    return bytes(decrypted_binary_cipher)
 
 
 # Configure argument parser for product cipher CLI
@@ -466,10 +543,10 @@ def main():
         elif args.operation == "decode":
             # Binary input file
             if args.input_file.endswith(".bin"):
-                message = decrypt_binary(
+                binary_cipher_text = decrypt_binary(
                     args.key_file, args.input_file, args.dimension, args.rounds
                 )
-                write_binary_file(args.output_file, message)
+                write_binary_file(args.output_file, binary_cipher_text)
 
             # Plaintext input file
             else:
