@@ -152,7 +152,8 @@ def encrypt_plaintext(
 ) -> str:
     key = get_plaintext_key(key_file_path)
     message = get_plaintext_message(input_file_path)
-    print(f"Encrypting message, {{message}} , with key, {{key}} ...\n")
+    print(f"Encrypting message, {message} , with key, {key} ...\n")
+
     block_size = dimension * dimension
 
     # The message can only be encrypted if it is at least the length of the block size
@@ -201,7 +202,7 @@ def encrypt_plaintext(
             block = columnar_result
         cipher_text_blocks.append("".join(block))
 
-    print(f"Resulting blocks after performing all rounds: {cipher_text_blocks}")
+    print(f"Resulting blocks after all rounds: {cipher_text_blocks}")
     cipher_text = "".join(cipher_text_blocks)
     print(f"Plaintext Encryption: {cipher_text}")
 
@@ -225,24 +226,27 @@ def write_plaintext_file(path: str, contents: str) -> None:
 def encrypt_binary(
     binary_key_path: str, input_path: str, dimension: int, rounds: int
 ) -> bytes:
-    print("Encrypting binary...")
     binary_key = get_binary_key(binary_key_path)
-    print(f"Binary key: {binary_key}")
     binary_message = get_binary_message(input_path)
-    print(f"Binary message: {binary_message}")
+    hex_binary_message = binary_message.hex()
+    print(
+        f"Encrypting binary message, {binary_message} , with binary key , {binary_key} ...\n"
+    )
+    print(f"Initial hex binary message: {hex_binary_message}")
 
     block_size = dimension * dimension
 
+    # The message can only be encrypted if it is at least the length (in bytes) of the block size
     if len(binary_message) < block_size:
         raise ValueError(
-            f"The binary message must be at least {block_size} bytes because the dimension is {dimension}."
+            f"The binary message must be at least {block_size} bytes because the dimension is {dimension}.\n"
         )
 
     binary_block = bytearray()
     binary_blocks = []
     binary_cipher_blocks = []
 
-    print(f"Binary list message: {binary_message}")
+    print(f"Binary message for encryption: {binary_message}\n")
 
     for byte in binary_message:
         binary_block.append(byte)
@@ -250,38 +254,41 @@ def encrypt_binary(
             binary_blocks.append(binary_block)
             binary_block = bytearray()
 
-    print(f"Binary blocks: {binary_blocks}")
+    print(f"Binary blocks: {binary_blocks}\n")
 
     if binary_block:
         pad_binary_block(binary_block, dimension)
         binary_blocks.append(binary_block)
-
-    if len(binary_blocks) > 0 and len(binary_blocks[-1]) == block_size:
-        binary_padding_block = bytearray([0] + [255] * (block_size - 1))
+    elif (
+        not binary_block
+        and len(binary_blocks) > 0
+        and len(binary_blocks[-1]) == block_size
+    ):
+        binary_padding_block = [0x58] + [0x59] * (block_size - 1)
         binary_blocks.append(binary_padding_block)
 
     for binary_block in binary_blocks:
         for r in range(rounds):
-            print(f"Round {r + 1}...")
-            if len(binary_block) < block_size:
-                pad_binary_block(binary_block, dimension)
+            print(f"Round {r + 1}...\n")
+            binary_shift_values = get_binary_shift_values(binary_key)
             binary_vigenere_result = perform_vigenere_on_binary(
-                get_binary_shift_values(binary_key), binary_block
+                binary_shift_values, binary_block
             )
+            print(f"Round {r + 1} binary vigenere result: {binary_vigenere_result}\n")
             binary_columnar_result = perform_columnar_on_binary(
                 binary_vigenere_result, dimension
             )
-            print(f"Result after round {r + 1}: {binary_columnar_result}")
+            print(f"Result after round {r + 1}: {binary_columnar_result}\n")
 
             binary_block = binary_columnar_result
         binary_cipher_blocks.append(bytes(binary_block))
 
-    print(f"Result after all blocks and rounds: {binary_cipher_blocks}")
+    print(f"Binary blocks after all rounds: {binary_cipher_blocks}\n")
 
     binary_cipher = b"".join(binary_cipher_blocks)
-    print(f"Binary cipher: {binary_cipher}")
+    print(f"Binary cipher: {binary_cipher}\n")
     hex_binary_cipher = binary_cipher.hex()
-    print(f"Hex binary cipher: {hex_binary_cipher}")
+    print(f"Hex binary cipher: {hex_binary_cipher}\n")
     return binary_cipher
 
 
