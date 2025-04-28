@@ -311,6 +311,7 @@ def reverse_plaintext_columnar(
     plaintext_cipher_block: list[str], dimension: int
 ) -> list[str]:
     print("Reversing columnar transposition on plaintext...")
+    # Assumes length that is divisible by the dimension
     num_rows = len(plaintext_cipher_block) // dimension
 
     vigenere_result = [""] * len(plaintext_cipher_block)
@@ -321,19 +322,19 @@ def reverse_plaintext_columnar(
             vigenere_result[row * dimension + col] = plaintext_cipher_block[idx]
             idx += 1
 
-    print(vigenere_result)
+    print(f"Vigenere result: {vigenere_result}")
     return vigenere_result
 
 
 def reverse_plaintext_vigenere(
-    plaintext_shift_values: list[int], reverse_transposition: list[str]
+    plaintext_shift_values: list[int], vigenere_result: list[str]
 ) -> list[str]:
     print("Reversing vignere on plaintext...")
     reverse_vigenere = []
 
     shift_len = len(plaintext_shift_values)
 
-    for i, char in enumerate(reverse_transposition):
+    for i, char in enumerate(vigenere_result):
         if char.isalpha():
             shift = plaintext_shift_values[i % shift_len]
             if char.isupper():
@@ -380,25 +381,24 @@ def reverse_columnar_on_binary(binary_block: bytes, dimension: int) -> bytes:
             vigenere_binary_result[row * dimension + col] = binary_block[idx]
             idx += 1
 
-    print(vigenere_binary_result)
+    print(f"Binary vigenere result: {vigenere_binary_result}")
     return vigenere_binary_result
 
 
 def reverse_vigenere_on_binary(
-    binary_shift_values: list[int], reverse_binary_transposition: bytes
+    binary_shift_values: list[int], vigenere_binary_result: bytes
 ) -> bytes:
     print("Reversing vignere on binary...")
     reverse_binary_vigenere = bytearray()
 
     binary_shift_len = len(binary_shift_values)
 
-    for i, byte in enumerate(reverse_binary_transposition):
+    for i, byte in enumerate(vigenere_binary_result):
         binary_shift = binary_shift_values[i % binary_shift_len]
         shifted_byte = (byte - binary_shift) % 256
-        print(f"Shifted byte: {shifted_byte}")
         reverse_binary_vigenere.append(shifted_byte)
 
-    print(f"Reverse vigenere: {reverse_binary_vigenere}")
+    print(f"Reversed binary vigenere: {reverse_binary_vigenere}")
     return reverse_binary_vigenere
 
 
@@ -422,12 +422,10 @@ def remove_binary_padding(binary_block: bytes):
 
 # Plaintext decryption
 def decrypt_plaintext(key_file, input_file, dimension, rounds) -> str:
-    print("Decrypting plaintext...")
-    decrypted_message = ""
     plaintext_key = get_plaintext_key(key_file)
-    print(f"Plaintext key: {plaintext_key}")
     plaintext_cipher = get_plaintext_message(input_file)
-    print(f"Plaintext cipher: {plaintext_cipher}")
+    print(f"Decrypting plaintext cipher, {plaintext_cipher} , with {plaintext_key} ...")
+    decrypted_message = ""
 
     block_size = dimension * dimension
 
@@ -443,10 +441,11 @@ def decrypt_plaintext(key_file, input_file, dimension, rounds) -> str:
     for idx, block in enumerate(blocks):
         for r in range(rounds):
             print(f"Round: {r + 1}")
-            reverse_transposition = reverse_plaintext_columnar(block, dimension)
-            print(f"Reverse transposition: {reverse_transposition}")
+            vigenere_result = reverse_plaintext_columnar(block, dimension)
+            print(f"Reverse transposition: {vigenere_result}")
+            plaintext_shift_values = get_plaintext_shift_values(plaintext_key)
             reverse_vigenere = reverse_plaintext_vigenere(
-                get_plaintext_shift_values(plaintext_key), reverse_transposition
+                plaintext_shift_values, vigenere_result
             )
             print(f"Reversed vigenere: {reverse_vigenere}")
 
@@ -464,12 +463,15 @@ def decrypt_plaintext(key_file, input_file, dimension, rounds) -> str:
 
 # Binary Decryption
 def decrypt_binary(key_file, input_file, dimension, rounds) -> bytes:
-    print("Decrypting binary...")
     binary_key = get_binary_key(key_file)
-    print(f"Binary key: {binary_key}")
     binary_cipher = get_binary_message(input_file)
-    print(f"Binary cipher: {binary_cipher}")
+    print(
+        f"Decrypting binary cipher, {binary_cipher} with binary key, {binary_key} ..."
+    )
     binary_cipher = bytearray(binary_cipher)
+    hex_binary_cipher = binary_cipher.hex()
+
+    print(f"Initial hex of binary cipher: {hex_binary_cipher}")
     decrypted_binary_cipher = bytearray()
 
     block_size = dimension * dimension
@@ -486,12 +488,11 @@ def decrypt_binary(key_file, input_file, dimension, rounds) -> bytes:
     for idx, binary_block in enumerate(binary_blocks):
         for r in range(rounds):
             print(f"Round: {r + 1}")
-            reverse_binary_transposition = reverse_columnar_on_binary(
-                binary_block, dimension
-            )
-            print(f"Reverse binary transposition: {reverse_binary_transposition}")
+            vigenere_binary_result = reverse_columnar_on_binary(binary_block, dimension)
+            print(f"Reverse binary transposition: {vigenere_binary_result}")
+            binary_shift_values = get_binary_shift_values(binary_key)
             reverse_binary_vigenere = reverse_vigenere_on_binary(
-                get_binary_shift_values(binary_key), reverse_binary_transposition
+                binary_shift_values, vigenere_binary_result
             )
             print(f"Reversed binary vigenere: {reverse_binary_vigenere}")
 
@@ -502,7 +503,9 @@ def decrypt_binary(key_file, input_file, dimension, rounds) -> bytes:
             print(f"Binary block after padding removal: {binary_block}")
 
         decrypted_binary_cipher.extend(binary_block)
-        print(f"Decrypted message: {decrypted_binary_cipher}")
+        hex_decrypted_binary_cipher = decrypted_binary_cipher.hex()
+        print(f"Decrypted binary cipher: {decrypted_binary_cipher}")
+        print(f"Decrypted hex binary cipher: {hex_decrypted_binary_cipher}")
 
     return bytes(decrypted_binary_cipher)
 
